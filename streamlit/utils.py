@@ -8,24 +8,39 @@ from sklearn.model_selection import train_test_split
 with open("config.yml", "r") as ymlfile:
     config = yaml.load(ymlfile)
 
-# converting file into pandas dataframe
+
 @st.cache(suppress_st_warning=True)
 def to_df(file):
+    """Convert input file into pandas dataframe.
+    
+    Keyword argument:
+    file -- gzip file uploaded by user
+    """
 
     df = pd.read_csv(file, compression="gzip", dtype=config["data_types"])
     df.drop("date", axis=1, inplace=True)
 
     return df
 
-# initiating environment
 @st.cache(suppress_st_warning=True)
 def create_setup(df):
+    """Initiate pycaret regression environment.
+
+    Keyword argument:
+    df -- pandas dataframe of input data
+    """
 
     reg01 = setup(data=df, target='demand', session_id=123, normalize=True, fold=2, numeric_features=config["numeric"],
             ordinal_features={"item_id": list(df["item_id"].unique())}, data_split_shuffle=False,
             fold_strategy="timeseries", silent=True)
 
 def compare(models_chosen, show_metrics=True):
+    """Build and return trained model objects chosen by user.
+
+    Keyword arguments:
+    models_chosen -- a list of the names of the algorithms chosen by user
+    show_metrics -- whether to show metrics of models campared (default True)
+    """
 
     models_to_create = [config["models_dict"][model] for model in models_chosen]
 
@@ -50,8 +65,13 @@ def compare(models_chosen, show_metrics=True):
             return compared
 
 def tune(compared, show_metric=False):
+    """Tune and return tuned model objects chosen by user.
+    
+    Keyword arguments:
+    compared -- a single or list of trained model objects
+    show_metrics -- whether to show metrics of models campared (default False)
+    """ 
 
-    # show_metric=False condition is used not to show metrics for automl func
     with st.spinner("Tuning..."):
         if isinstance(compared, list):
             allTunedMetrics_df = pd.DataFrame(columns=["MAE", "RMSLE", "MAPE"])
@@ -101,8 +121,13 @@ def tune(compared, show_metric=False):
 
             return tuned_compared
 
-# creating plot with predictions
+
 def plot(predict_df):
+    """Plot the predictions for specific items.
+
+    Keyword arguments:
+    predict_df -- dataframe with model predictions
+    """
 
     df = pd.read_csv(config["filepath"], compression="gzip", dtype=config["data_types"])
 
@@ -113,7 +138,7 @@ def plot(predict_df):
     predict_df.drop(predict_df.tail(1).index,inplace=True)
     new["demand"] = predict_df["Label"].values
     new = new \
-        .loc[(new['store_id'] == 'CA_3')&(new['item_id'].isin(['HOUSEHOLD_1_383', 'HOUSEHOLD_1_366', 'HOUSEHOLD_1_349'])), ['date', 'item_id','demand']]
+        .loc[(new['store_id'] == 'CA_3') & (new['item_id'].isin(['HOUSEHOLD_1_383', 'HOUSEHOLD_1_366', 'HOUSEHOLD_1_349'])), ['date', 'item_id','demand']]
     train["Type"] = "historical"
     new["Type"] = "predicted"
     res = pd.concat([train,new])
@@ -130,6 +155,11 @@ def plot(predict_df):
     st.altair_chart(chart)
 
 def train(model_chosen, tune_button):
+    """Return baseline or tuned model object.
+
+    model_chosen -- names of algorithms chosen by user
+    tune_button --  whether to enable tuning of hyperparameters
+    """
 
     if not tune_button:
         final = compare(models_chosen=model_chosen, show_metrics=True)
@@ -139,6 +169,11 @@ def train(model_chosen, tune_button):
     return final
 
 def autoML(df):
+    """Create all possible baselines as well as tuned models and return the best one with respect to "MAE" score.
+
+    Keyword argument:
+    df -- dataframe of input data
+    """
 
     reg = setup(data=df, target='demand', session_id=123,  normalize=True, fold=2, numeric_features=config["numeric"],
                   ordinal_features={"item_id": list(df["item_id"].unique())},
@@ -159,9 +194,6 @@ def autoML(df):
     met = met.iloc[-2]
     met = pd.DataFrame(met.values, columns=[est_name], index=met.index)
     met = met.transpose()
-
-    # in custom training way you created met1, but here just save changes to met.
-    # Just use one style for the whole script
     met = met.style.set_properties(**{'background-color': "#4DBFD9"}, subset=['MAE'])
 
     st.write(f"{est_name} is the best model with respect to MAE score and is chosen for predictions")
@@ -170,6 +202,12 @@ def autoML(df):
     return final
 
 def predict(final, model_selected):
+    """Return dataframe with predictions of the model chosen by user.
+
+    Keyword arguments:
+    final -- a list of trained (tuned) model objects
+    model_selected -- name of algorithm chosen by user to make predictions
+    """
 
     for i in final:
         if isinstance(i, config["mod_class_dict"][model_selected]):
