@@ -1,0 +1,7 @@
+yaml
+streamlit
+lightgbm
+sklearn
+pycaret
+altair
+pandas
